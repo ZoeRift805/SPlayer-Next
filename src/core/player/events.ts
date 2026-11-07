@@ -11,6 +11,7 @@ import * as autoClose from "@/services/autoClose";
 import * as abLoop from "@/services/abLoop";
 import * as cacheScheduler from "@/services/cacheScheduler";
 import { setDeviceVolume } from "@/services/deviceVolume";
+import { onPosition as onGuestPosition } from "@/services/guestLimit";
 import * as playStats from "./stats";
 import {
   applySavedVolumeForActiveDevice,
@@ -124,6 +125,8 @@ export const handleEvent = async (event: PlayerEvent): Promise<void> => {
       useMediaStore().updateLyricIndex(adjusted + status.lyricOffsetMs);
       // AB 循环：到达 B 点 seek 回 A
       abLoop.checkLoop(adjusted);
+      // 未登录试听限制：单曲到点或每日额度用完时暂停
+      if (status.isPlaying && onGuestPosition(adjusted)) void pause();
       // 推进延时缓存调度
       cacheScheduler.tick(adjusted);
       void trySmartTransition(adjusted).catch((error) => {

@@ -2445,6 +2445,8 @@
     "NETEASE_LOGIN_EXPIRED": "Login expired; switched to guest mode",
     "NETEASE_VIP_REQUIRED": "This track requires a membership or separate purchase",
     "NETEASE_TRIAL_DISABLED": "Only a trial is available; enable trial playback in settings",
+    "GUEST_TRIAL_LIMIT": "Guests can preview each track for 1 minute — sign in for full playback",
+    "GUEST_DAILY_LIMIT": "Daily guest listening limit (30 minutes) reached — sign in to continue",
     "NETEASE_UNAVAILABLE": "No source is currently available for this track",
     "SCAN_NO_DIRS": "No scan directories configured",
     "SCAN_DIR_EXISTS": "Directory already exists",

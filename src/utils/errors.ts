@@ -8,6 +8,8 @@ const SILENT_ERRORS = new Set<string>([
   ErrorCode.FILE_NOT_SELECTED,
   ErrorCode.SCAN_DIR_NOT_SELECTED,
   ErrorCode.LOAD_SUPERSEDED,
+  // 提示由访客限制服务一次性发出，这里拦截避免跳曲链条反复弹
+  ErrorCode.GUEST_DAILY_LIMIT,
 ]);
 
 /** 可通过跳曲解决的错误（单曲级别，非全局性） */

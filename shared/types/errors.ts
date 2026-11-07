@@ -42,6 +42,12 @@ export enum ErrorCode {
   /** 在线歌曲暂无可用官方音源 */
   NETEASE_UNAVAILABLE = "NETEASE_UNAVAILABLE",
 
+  // 访客限制
+  /** 未登录单曲试听已到 1 分钟上限 */
+  GUEST_TRIAL_LIMIT = "GUEST_TRIAL_LIMIT",
+  /** 未登录每日试听时长已用完 */
+  GUEST_DAILY_LIMIT = "GUEST_DAILY_LIMIT",
+
   // 标签编辑相关
   /** 读取文件标签失败 */
   TAG_READ_FAILED = "TAG_READ_FAILED",

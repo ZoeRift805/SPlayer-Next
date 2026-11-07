@@ -27,6 +27,7 @@ import * as autoClose from "@/services/autoClose";
 import * as cacheScheduler from "@/services/cacheScheduler";
 import { getDeviceVolume, setDeviceVolume } from "@/services/deviceVolume";
 import { resolveTrackSource, type ResolvedTrackSource } from "@/services/audioSource";
+import { checkResume, installGuestLimit } from "@/services/guestLimit";
 import {
   consumePreloadedTrack,
   disposeNextTrackPreload,
@@ -537,6 +538,8 @@ let pendingPlayAfterRestore = false;
 
 /** 恢复播放 */
 export const play = async (): Promise<void> => {
+  // 未登录受限曲目的恢复拦截：额度用完或单曲试听到点，不允许继续发声
+  if (checkResume()) return;
   const status = useStatusStore();
   if (isRestoringLastTrack) {
     pendingPlayAfterRestore = true;
@@ -1464,6 +1467,8 @@ export const initPlayer = async (): Promise<void> => {
   unsubscribe = window.api.player.onEvent(handleEvent);
   // 安装播放统计累加器
   installPlayStats();
+  // 安装未登录播放限制
+  installGuestLimit();
   // 订阅主进程下发的歌词偏移变化
   const media = useMediaStore();
   // 当前歌曲喜欢状态变化时同步到托盘菜单
