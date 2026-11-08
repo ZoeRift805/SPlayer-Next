@@ -1,7 +1,7 @@
 /**
  * 未登录播放限制（访客模式）
  *
- * 对应平台未登录时：
+ * 网易云未登录时，所有在线平台（netease / qqmusic / kugou）歌曲均受限：
  * - 会员歌曲不做插件音源兜底，直接提示需要会员
  * - 非会员歌曲每首最多播放 1 分钟，到点暂停
  * - 每日累计播放时长上限 30 分钟，用完当日不再播放受限平台歌曲
@@ -11,10 +11,8 @@
  */
 
 import type { Track } from "@shared/types/player";
-import type { Platform } from "@shared/types/platform";
 import { ErrorCode } from "@shared/types/errors";
 import { useUserStore } from "@/stores/user";
-import { useDataStore } from "@/stores/data";
 import { useMediaStore } from "@/stores/media";
 import { useStatusStore } from "@/stores/status";
 import * as playback from "@/services/playback";
@@ -126,28 +124,21 @@ const notifyTrial = (key: string): void => {
 const trackKeyOf = (track: Track): string => `${track.source}:${track.id}`;
 
 /**
- * 平台未登录判定
- * @param platform - 平台标识
- * @returns 该平台未登录时为 true
+ * 访客判定：统一看网易云登录态，未登录时所有在线平台歌曲都受限
+ * @returns 网易云未登录时为 true
  */
-export const isGuestFor = (platform: Platform): boolean => {
-  if (platform === "netease") return !useUserStore().isLoggedIn;
-  if (platform === "qqmusic" || platform === "kugou") {
-    return !useDataStore().getPlatformProfile(platform);
-  }
-  return false;
-};
+export const isGuest = (): boolean => !useUserStore().isLoggedIn;
 
 /**
  * 曲目受访客限制的判定
  * @param track - 要判定的曲目
- * @returns 曲目所属平台未登录时为 true，并收窄 null
+ * @returns 在线平台歌曲且网易云未登录时为 true，并收窄 null
  */
 export const isTrackLimited = (track: Track | null): track is Track => {
   if (!track) return false;
   const source = track.source;
   if (source === "netease" || source === "qqmusic" || source === "kugou") {
-    return isGuestFor(source);
+    return isGuest();
   }
   return false;
 };

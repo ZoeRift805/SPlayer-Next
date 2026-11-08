@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   playbackTime: 0,
   playState: "paused",
   neteaseLoggedIn: false,
-  qqProfile: null as unknown,
   track: null as Track | null,
 }));
 
@@ -22,9 +21,6 @@ vi.mock("@/stores/status", () => ({
 }));
 vi.mock("@/stores/user", () => ({
   useUserStore: () => ({ isLoggedIn: mocks.neteaseLoggedIn }),
-}));
-vi.mock("@/stores/data", () => ({
-  useDataStore: () => ({ getPlatformProfile: () => mocks.qqProfile }),
 }));
 vi.mock("@/stores/media", () => ({
   useMediaStore: () => ({ track: mocks.track }),
@@ -50,22 +46,29 @@ describe("未登录播放限制", () => {
     mocks.playbackTime = 0;
     mocks.playState = "paused";
     mocks.neteaseLoggedIn = false;
-    mocks.qqProfile = null;
     mocks.track = null;
   });
 
-  it("对应平台未登录时受限，登录后解除", async () => {
+  it("网易云未登录时受限，登录后解除", async () => {
     const { isTrackLimited } = await loadGuestLimit();
     expect(isTrackLimited(neteaseTrack)).toBe(true);
     mocks.neteaseLoggedIn = true;
     expect(isTrackLimited(neteaseTrack)).toBe(false);
   });
 
-  it("QQ 音乐按独立登录态判定", async () => {
+  it("QQ 音乐同样只看网易云登录态", async () => {
     const { isTrackLimited } = await loadGuestLimit();
     const track: Track = { id: "3", title: "歌曲", source: "qqmusic", artists: [], duration: 0 };
     expect(isTrackLimited(track)).toBe(true);
-    mocks.qqProfile = { uid: "1" };
+    mocks.neteaseLoggedIn = true;
+    expect(isTrackLimited(track)).toBe(false);
+  });
+
+  it("酷狗歌曲同样只看网易云登录态", async () => {
+    const { isTrackLimited } = await loadGuestLimit();
+    const track: Track = { id: "4", title: "歌曲", source: "kugou", artists: [], duration: 0 };
+    expect(isTrackLimited(track)).toBe(true);
+    mocks.neteaseLoggedIn = true;
     expect(isTrackLimited(track)).toBe(false);
   });
 
@@ -89,7 +92,7 @@ describe("未登录播放限制", () => {
     expect(checkTrackStart(neteaseTrack)).toBeNull();
   });
 
-  it("已登录平台不检查额度", async () => {
+  it("网易云已登录时不检查额度", async () => {
     seedUsage(todayKey(), 30 * 60_000);
     mocks.neteaseLoggedIn = true;
     const { checkTrackStart } = await loadGuestLimit();

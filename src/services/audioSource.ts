@@ -8,7 +8,7 @@ import { useUserStore } from "@/stores/user";
 import { resolveNeteaseUrl } from "@/apis/song/netease";
 import { resolveQQMusicUrl } from "@/apis/song/qqmusic";
 import { resolveKugouUrl } from "@/apis/song/kugou";
-import { checkTrackStart, isGuestFor } from "./guestLimit";
+import { checkTrackStart, isGuest } from "./guestLimit";
 import { ErrorCode } from "@shared/types/errors";
 import { handleError } from "@/utils/errors";
 
@@ -210,10 +210,10 @@ const resolveOnlineUrl = async (
         authenticated: user.isLoggedIn,
         validate: () => user.fetchStatus(),
       });
-      // 未登录平台：会员歌曲（含试听片段）不做插件音源兜底，直接提示需要会员；
+      // 未登录网易云：会员歌曲（含试听片段）不做插件音源兜底，直接提示需要会员；
       // 无版权歌曲（UNAVAILABLE）不是会员歌，仍允许插件跨平台兜底
       if (
-        isGuestFor("netease") &&
+        isGuest() &&
         (resolved.available
           ? resolved.isTrial
           : resolved.errorCode !== ErrorCode.NETEASE_UNAVAILABLE)
@@ -238,8 +238,8 @@ const resolveOnlineUrl = async (
   if (track.source === "qqmusic" && !options.skipOfficialOnline) {
     try {
       const resolved = await resolveQQMusicUrl(track, songLevel);
-      // 未登录平台：官方接口无法区分需会员与无版权，失败时不做插件兜底
-      if (!resolved.available && isGuestFor("qqmusic")) {
+      // 未登录网易云：官方接口无法区分需会员与无版权，失败时不做插件兜底
+      if (!resolved.available && isGuest()) {
         return { ok: false, errorCode: resolved.errorCode };
       }
       if (resolved.available) {
@@ -254,8 +254,8 @@ const resolveOnlineUrl = async (
   if (track.source === "kugou" && !options.skipOfficialOnline) {
     try {
       const resolved = await resolveKugouUrl(track, songLevel);
-      // 未登录平台：官方接口无法区分需会员与无版权，失败时不做插件兜底
-      if (!resolved.available && isGuestFor("kugou")) {
+      // 未登录网易云：官方接口无法区分需会员与无版权，失败时不做插件兜底
+      if (!resolved.available && isGuest()) {
         return { ok: false, errorCode: resolved.errorCode };
       }
       if (resolved.available) {
@@ -337,7 +337,7 @@ export const resolveTrackSource = async (
       pluginId: resolved.pluginId,
     };
   }
-  // 未登录平台：每日试听额度用完后拦截（含命中下载/缓存的播放）
+  // 未登录网易云：每日试听额度用完后拦截（含命中下载/缓存的播放）
   if (isOnlinePlatform(track.source)) {
     const guestBlock = checkTrackStart(track);
     if (guestBlock) {
