@@ -92,6 +92,20 @@ describe("未登录播放限制", () => {
     expect(checkTrackStart(neteaseTrack)).toBeNull();
   });
 
+  it("会话内跨午夜后额度归零", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-06-01T23:59:00"));
+      seedUsage("2026-06-01", 30 * 60_000);
+      const { checkTrackStart } = await loadGuestLimit();
+      expect(checkTrackStart(neteaseTrack)).toBe(ErrorCode.GUEST_DAILY_LIMIT);
+      vi.setSystemTime(new Date("2026-06-02T00:01:00"));
+      expect(checkTrackStart(neteaseTrack)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("网易云已登录时不检查额度", async () => {
     seedUsage(todayKey(), 30 * 60_000);
     mocks.neteaseLoggedIn = true;

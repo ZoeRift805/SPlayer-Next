@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
 import type { Track } from "@shared/types/player";
 import { ErrorCode } from "@shared/types/errors";
 
@@ -28,8 +27,6 @@ import { resolveTrackSource } from "./audioSource";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // guestLimit 的平台登录判定会读取真实 data store，需要活跃 Pinia
-  setActivePinia(createPinia());
   mocks.lookup.mockReset().mockResolvedValue(null);
   mocks.settings.system.cache.songCache.enabled = false;
   Object.assign(window, {

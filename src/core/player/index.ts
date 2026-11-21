@@ -11,6 +11,7 @@ import type { TagEditRequest, TagWriteOutcome } from "@shared/types/tagEditor";
 import type { PersonalFmOptions } from "@shared/types/platform/netease";
 import { handleEvent } from "./events";
 import { useMediaStore } from "@/stores/media";
+import { useUserStore } from "@/stores/user";
 import { useSettingsStore } from "@/stores/settings";
 import { useStatusStore } from "@/stores/status";
 import { useStreamingStore } from "@/stores/streaming";
@@ -27,7 +28,11 @@ import * as autoClose from "@/services/autoClose";
 import * as cacheScheduler from "@/services/cacheScheduler";
 import { getDeviceVolume, setDeviceVolume } from "@/services/deviceVolume";
 import { resolveTrackSource, type ResolvedTrackSource } from "@/services/audioSource";
-import { checkResume, installGuestLimit } from "@/services/guestLimit";
+import {
+  checkResume,
+  installGuestLimit,
+  onPosition as onGuestPosition,
+} from "@/services/guestLimit";
 import {
   consumePreloadedTrack,
   disposeNextTrackPreload,
@@ -1469,6 +1474,18 @@ export const initPlayer = async (): Promise<void> => {
   installPlayStats();
   // 安装未登录播放限制
   installGuestLimit();
+  // 登录态变化时失效下一曲预载，防止登出后预载槽位绕过访客限制
+  watch(
+    () => useUserStore().isLoggedIn,
+    () => invalidateNextTrackPreload(),
+  );
+  // 未登录限制兜底定时器：主窗口隐藏时主进程不推送 position 事件，
+  // 播放中的音频让页面免于深度节流，定时器可正常驱动到点暂停
+  setInterval(() => {
+    const status = useStatusStore();
+    if (!status.isPlaying) return;
+    if (onGuestPosition(playback.getCurrentTime())) void pause();
+  }, 1000);
   // 订阅主进程下发的歌词偏移变化
   const media = useMediaStore();
   // 当前歌曲喜欢状态变化时同步到托盘菜单

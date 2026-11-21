@@ -7,7 +7,7 @@
  * - 每日累计播放时长上限 30 分钟，用完当日不再播放受限平台歌曲
  *
  * 额度只累计受限平台的墙钟播放时间，按天持久化在 localStorage；
- * 拦截判断不修改状态，实际暂停由 events.ts / play() 调用方执行
+ * 拦截判断不修改状态，实际暂停由 events.ts / play() 与 initPlayer 的兜底定时器执行
  */
 
 import type { Track } from "@shared/types/player";
@@ -43,7 +43,7 @@ let usage = loadUsage();
 let playingSince: number | null = null;
 /** 上次落盘时间 */
 let lastFlushAt = 0;
-/** 每日额度提示已发出（会话内一次） */
+/** 每日额度提示去重标记，切歌或跨天后重置 */
 let dailyNotified = false;
 /** 已到单曲上限并提示过的曲目 key，切歌后清除 */
 let cappedTrackKey: string | null = null;
@@ -96,8 +96,14 @@ function flushUsage(): void {
   }
 }
 
-/** 含在途区间的当日已用额度 */
-const usedMs = (): number => usage.ms + (playingSince !== null ? Date.now() - playingSince : 0);
+/** 含在途区间的当日已用额度，会话内跨午夜时归零重建 */
+const usedMs = (): number => {
+  if (usage.date !== todayKey()) {
+    usage = { date: todayKey(), ms: 0 };
+    dailyNotified = false;
+  }
+  return usage.ms + (playingSince !== null ? Date.now() - playingSince : 0);
+};
 
 /** 结清进行中的 playing 区间进额度 */
 const settle = (): void => {
@@ -106,18 +112,18 @@ const settle = (): void => {
   playingSince = null;
 };
 
-/** 每日额度提示（会话内一次） */
-const notifyDaily = (): void => {
-  if (dailyNotified) return;
+/** 每日额度提示，切歌或跨天后可再次提示 */
+const notifyDaily = (force = false): void => {
+  if (!force && dailyNotified) return;
   dailyNotified = true;
-  toast.error(i18n.global.t("errors.GUEST_DAILY_LIMIT"));
+  toast.error(i18n.global.t(`errors.${ErrorCode.GUEST_DAILY_LIMIT}`));
 };
 
-/** 单曲上限提示（同曲一次，切歌后可再提示） */
-const notifyTrial = (key: string): void => {
-  if (cappedTrackKey === key) return;
+/** 单曲上限提示，同曲去重，切歌后可再提示；force 用于播放键等用户动作 */
+const notifyTrial = (key: string, force = false): void => {
+  if (!force && cappedTrackKey === key) return;
   cappedTrackKey = key;
-  toast.error(i18n.global.t("errors.GUEST_TRIAL_LIMIT"));
+  toast.error(i18n.global.t(`errors.${ErrorCode.GUEST_TRIAL_LIMIT}`));
 };
 
 /** 曲目身份标识 */
@@ -146,12 +152,16 @@ export const isTrackLimited = (track: Track | null): track is Track => {
 /**
  * 曲目开始播放前的额度拦截，供音源解析入口调用
  * @param track - 要开始播放的曲目
+ * @param options - 解析选项；静默解析（如后台预载）时不弹提示
  * @returns 拦截错误码；未拦截返回 null
  */
-export const checkTrackStart = (track: Track): ErrorCode | null => {
+export const checkTrackStart = (
+  track: Track,
+  options: { silent?: boolean } = {},
+): ErrorCode | null => {
   if (!isTrackLimited(track)) return null;
   if (usedMs() >= DAILY_BUDGET_MS) {
-    notifyDaily();
+    if (!options.silent) notifyDaily();
     return ErrorCode.GUEST_DAILY_LIMIT;
   }
   return null;
@@ -165,11 +175,11 @@ export const checkResume = (): boolean => {
   const track = useMediaStore().track;
   if (!isTrackLimited(track)) return false;
   if (usedMs() >= DAILY_BUDGET_MS) {
-    notifyDaily();
+    notifyDaily(true);
     return true;
   }
   if (playback.getCurrentTime() >= TRACK_TRIAL_MS) {
-    notifyTrial(trackKeyOf(track));
+    notifyTrial(trackKeyOf(track), true);
     return true;
   }
   return false;
@@ -201,24 +211,22 @@ export const installGuestLimit = (): void => {
   const status = useStatusStore();
   const media = useMediaStore();
 
-  // 曲目切换后解除同曲去重，换曲重新允许 1 分钟试听；
-  // 若播放未中断，按新曲目的受限状态重启计时，避免不受限曲目被计入额度
+  // 曲目切换后解除同曲去重；若播放未中断，按新曲目的受限状态重启额度计时
+  // （settle 对无计时区间是安全空操作，不受限曲目播放中切到受限曲目也能立即开始计数）
   watch(
     () => (media.track ? trackKeyOf(media.track) : null),
     () => {
       cappedTrackKey = null;
       dailyNotified = false;
-      if (playingSince !== null) {
-        settle();
-        if (status.state === "playing" && isTrackLimited(media.track)) {
-          playingSince = Date.now();
-        }
+      settle();
+      if (status.state === "playing" && isTrackLimited(media.track)) {
+        playingSince = Date.now();
       }
     },
   );
 
   // 播放态驱动额度累计（墙钟），窗口隐藏时也准确；
-  // 额度用完后的停止由下个 position 事件（≤200ms 内）兜底
+  // 到点暂停由 position 事件与 initPlayer 的兜底定时器共同驱动
   watch(
     () => status.state,
     (state) => {

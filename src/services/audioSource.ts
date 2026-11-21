@@ -232,6 +232,8 @@ const resolveOnlineUrl = async (
       }
     } catch (err) {
       console.warn("[audio-source] official URL resolve failed:", err);
+      // 未登录网易云：官方接口异常时不做插件音源兜底，与 qq/酷狗访客的处理保持一致
+      if (isGuest()) return { ok: false, errorCode: ErrorCode.NETWORK_ERROR };
       officialErrorCode = ErrorCode.NETWORK_ERROR;
     }
   }
@@ -337,9 +339,9 @@ export const resolveTrackSource = async (
       pluginId: resolved.pluginId,
     };
   }
-  // 未登录网易云：每日试听额度用完后拦截（含命中下载/缓存的播放）
+  // 未登录网易云：每日试听额度用完后拦截本次播放（预载槽位随登录态变化失效）
   if (isOnlinePlatform(track.source)) {
-    const guestBlock = checkTrackStart(track);
+    const guestBlock = checkTrackStart(track, options);
     if (guestBlock) {
       reportLoadError(guestBlock, options);
       return null;
